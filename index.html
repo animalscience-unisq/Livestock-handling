@@ -382,49 +382,58 @@ function applyWalls(a){
   if(sc===0){
     const gate=gates.find(gt=>gt.id==='main');
     const wallX=g.wallX;
-    // Wall occupies from wallX to wallX+8. When gate closed, it's solid.
+    const wallRight=wallX+8;
+
     if(!gate.open){
-      // Left side: animal can't cross right past wallX
-      if(a.x+pad>wallX && a.x<wallX+8){
+      // Solid wall when gate closed — block crossing in either direction
+      if(a.x<wallX&&a.x+pad>wallX){
+        // Animal in pen1 hitting the wall from the left
         a.x=wallX-pad; a.vx=-Math.abs(a.vx)*0.5;
       }
-      // Right side: animal can't cross left past wallX+8
-      if(a.x-pad<wallX+8 && a.x>wallX){
-        a.x=wallX+8+pad; a.vx=Math.abs(a.vx)*0.5;
+      if(a.x>wallRight&&a.x-pad<wallRight){
+        // Animal in pen2 hitting the wall from the right
+        a.x=wallRight+pad; a.vx=Math.abs(a.vx)*0.5;
       }
     }
-    // Hard pen bounds
-    clampRect(a,g.pen1,pad);
-    if(a.x>wallX+8) clampRect(a,g.pen2,pad);
+    // FIX: clamp each animal only to the pen it is currently in
+    // Determine which pen the animal belongs to by its current x position
+    if(a.x<=wallX){
+      // In pen1 (or crossing left — snap to pen1)
+      clampRect(a,g.pen1,pad);
+    } else {
+      // In pen2 (crossed through open gate)
+      clampRect(a,g.pen2,pad);
+    }
+    return; // skip remaining wall logic for scenario 0
   }
 
   // ── Gate walls for scenarios 1-4 ──
   gates.forEach(gt=>{
     if(gt.open||gt.id==='draftGate') return;
     if(!gt.vertical) return;
-    const gMid=gt.x+gt.w/2;
-    // Only block if animal is within the gate's y-range (± size)
-    if(a.y<gt.y-pad||a.y>gt.y+gt.h+pad) return;
-    // Approaching from left
-    if(a.vx>0&&a.x<gMid&&a.x+pad>gt.x){
-      a.x=gt.x-pad; a.vx=-Math.abs(a.vx)*0.5;
+    const gLeft=gt.x;
+    const gRight=gt.x+gt.w;
+    // Only block if animal is within the gate's y-range
+    if(a.y<gt.y-a.size||a.y>gt.y+gt.h+a.size) return;
+    // Approaching from left → bounce back left
+    if(a.vx>=0&&a.x+pad>gLeft&&a.x<gRight){
+      a.x=gLeft-pad; a.vx=-Math.abs(a.vx)*0.5;
     }
-    // Approaching from right
-    if(a.vx<0&&a.x>gMid&&a.x-pad<gt.x+gt.w){
-      a.x=gt.x+gt.w+pad; a.vx=Math.abs(a.vx)*0.5;
+    // Approaching from right → bounce back right
+    if(a.vx<=0&&a.x-pad<gRight&&a.x>gLeft){
+      a.x=gRight+pad; a.vx=Math.abs(a.vx)*0.5;
     }
   });
 
-  // ── Funnel walls (scenarios 1-4) ──
-  if(g.funnelTop){
-    const fw=g.funnelTop.w+pad;
-    if(a.x+pad>g.funnelTop.x&&a.x<g.funnelTop.x+fw&&a.y<g.funnelTop.y+g.funnelTop.h){
+  // ── Funnel walls (scenarios 1-4): only apply to animals still LEFT of the funnel ──
+  // Animals that have already passed through must not be pushed back
+  if(g.funnelTop&&a.x<=g.funnelTop.x+g.funnelTop.w+a.size){
+    if(a.x+pad>g.funnelTop.x&&a.y<g.funnelTop.y+g.funnelTop.h){
       a.x=g.funnelTop.x-pad; a.vx=-Math.abs(a.vx)*0.5;
     }
   }
-  if(g.funnelBot){
-    const fw=g.funnelBot.w+pad;
-    if(a.x+pad>g.funnelBot.x&&a.x<g.funnelBot.x+fw&&a.y>g.funnelBot.y){
+  if(g.funnelBot&&a.x<=g.funnelBot.x+g.funnelBot.w+a.size){
+    if(a.x+pad>g.funnelBot.x&&a.y>g.funnelBot.y){
       a.x=g.funnelBot.x-pad; a.vx=-Math.abs(a.vx)*0.5;
     }
   }
