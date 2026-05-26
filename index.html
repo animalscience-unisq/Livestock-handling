@@ -242,42 +242,48 @@ function buildGeo(lv){
     GEO.targetFn =a=>inZ(a,GEO.zones.exit);
 
   }else if(sc===3){
-    // ── YARD → RACE → DRAFT GATE → PEN A (top) + PEN B (bottom) ──
-    // The draft gate opens fully (full race height) so animals pass through easily.
-    // A deflector wall just past the gate steers them into penA (top) or penB (bottom).
+    // ── YARD → RACE → TWO PENS (A top, B bottom) ──
+    // Simple approach: the wall at dx has TWO gate openings.
+    // Gate A covers the top half of the wall (leads to penA).
+    // Gate B covers the bottom half (leads to penB).
+    // Each pen opening is rh/2 tall — big enough for one animal.
+    // Only one is open at a time = the draft direction.
     const yw=Math.round(W*0.28);
-    const rh=56, ry=Math.round((H-rh)/2);
-    const dx=Math.round(W*0.68);           // draft gate x
-    const defX=dx+40;                      // deflector wall x (just inside pen area)
+    const rh=80;                              // tall race so each half-gate is 40px
+    const ry=Math.round((H-rh)/2);
+    const dx=Math.round(W*0.68);
     const midy=Math.round(H/2);
     const pw=R-dx;
-    GEO.zones.yard ={x:L,  y:T,      w:yw-L,  h:B-T};
-    GEO.zones.race ={x:yw, y:ry,     w:dx-yw, h:rh};
-    GEO.zones.penA ={x:dx, y:T,      w:pw,     h:midy-T-4};
-    GEO.zones.penB ={x:dx, y:midy+4, w:pw,     h:B-midy-4};
+    const gateHA=Math.round(rh/2);           // height of each pen gate opening = 40px
+    // Pen A occupies upper screen, pen B lower screen
+    GEO.zones.yard ={x:L,   y:T,      w:yw-L,  h:B-T};
+    GEO.zones.race ={x:yw,  y:ry,     w:dx-yw, h:rh};
+    GEO.zones.penA ={x:dx,  y:T,      w:pw,     h:midy-T};
+    GEO.zones.penB ={x:dx,  y:midy,   w:pw,     h:B-midy};
     // Funnel + yard gate
     GEO.walls.push(vwall(yw, T,    ry,    null));
     GEO.walls.push(vwall(yw, ry+rh, B,   null));
     GEO.walls.push(vwall(yw, ry, ry+rh,  'yard'));
-    // Race horizontal walls
+    // Race corridor horizontal walls
     GEO.walls.push(hwall(ry,    yw, dx));
     GEO.walls.push(hwall(ry+rh, yw, dx));
-    // Solid wall at dx above and below the race opening (permanent)
-    GEO.walls.push(vwall(dx, T,     ry,    null));
-    GEO.walls.push(vwall(dx, ry+rh, B,    null));
-    // Draft gate: FULL race height — open = animals pass through freely
-    GEO.walls.push(vwall(dx, ry, ry+rh, 'draft'));
-    // Deflector wall just past the gate — 'defA' blocks path to penB, steering up to penA
-    //                                   — 'defB' blocks path to penA, steering down to penB
-    // defA: horizontal wall at midy from defX to R (closed = blocks downward path, open = clear)
-    GEO.walls.push(hwall(midy, defX, R, 'defB')); // open when going to B = floor removed
-    // Permanent horizontal divider at midy from dx to defX (always present)
-    GEO.walls.push(hwall(midy, dx, defX, null));
-    GEO.gates={yard:false, draft:true, defB:false};
-    // draftDir 'A' = draft open + defB closed (wall at midy forces animals up into penA)
-    // draftDir 'B' = draft open + defB open  (gap at midy lets animals go down into penB)
+    // Right-side wall at dx: solid above penA gate, solid between gates, solid below penB gate
+    const pyA1=T,   pyA2=ry;                 // solid above race (to top of screen)
+    const pyB1=ry+rh, pyB2=B;               // solid below race (to bottom of screen)
+    const pyMid1=ry+gateHA, pyMid2=ry+gateHA; // midpoint = where gates meet
+    GEO.walls.push(vwall(dx, T,          ry,       null));  // above race — solid
+    GEO.walls.push(vwall(dx, ry+rh,      B,        null));  // below race — solid
+    // The wall between the two gate openings (solid strip at the midpoint)
+    GEO.walls.push(vwall(dx, ry+gateHA-2, ry+gateHA+2, null)); // 4px solid divider
+    // Gate A: top half of race wall → leads to penA (upper)
+    GEO.walls.push(vwall(dx, ry,          ry+gateHA-2, 'gateA'));
+    // Gate B: bottom half of race wall → leads to penB (lower)
+    GEO.walls.push(vwall(dx, ry+gateHA+2, ry+rh,       'gateB'));
+    // Horizontal divider between penA and penB (full width, at midy)
+    GEO.walls.push(hwall(midy, dx, R, null));
+    GEO.gates={yard:false, gateA:true, gateB:false};  // A open by default
     GEO.draftDir='A';
-    GEO.draftRef={x:dx, y:ry, h:rh};
+    GEO.draftRef={x:dx, y:ry, h:rh, gateHA};
     GEO.spawnZone=GEO.zones.yard;
     GEO.targetFn =a=>{
       if(a.grp==='A') return inZ(a,GEO.zones.penA);
@@ -442,14 +448,15 @@ function updateAnimals(lv){
     // Draft error (sc 3 only)
     if(GEO.sc===3&&GEO.draftRef&&draftCd===0){
       const dr=GEO.draftRef;
-      if(Math.abs(a.x-dr.x)<50&&a.y>dr.y&&a.y<dr.y+dr.h){
+      if(Math.abs(a.x-dr.x)<60&&a.y>dr.y&&a.y<dr.y+dr.h){
         const wantsA=a.grp==='A';
         const goingA=GEO.draftDir==='A';
         if(wantsA!==goingA){
           draftErrCount++;liveScore=Math.max(0,liveScore-80);
           draftCd=300;
           GEO.draftDir=GEO.draftDir==='A'?'B':'A';
-          gateOpen.defB=GEO.draftDir==='B';
+          gateOpen.gateA=GEO.draftDir==='A';
+          gateOpen.gateB=GEO.draftDir==='B';
           msg('⚠ Draft error! −80 pts — gate toggled');
         }
       }
@@ -469,9 +476,14 @@ function updateAnimals(lv){
       a.vx+=(Math.random()-.5)*.04; a.vy+=(Math.random()-.5)*.04;
     }
 
-    // Separation / cohesion
+    // Separation / cohesion — only between animals in the same zone
+    // Animals in the race/pen don't get pulled back toward yard animals
+    const aInYard = GEO.spawnZone && inZ(a, GEO.spawnZone);
     animals.forEach(o=>{
       if(o===a||o.placed)return;
+      const oInYard = GEO.spawnZone && inZ(o, GEO.spawnZone);
+      // Skip cohesion pull if animals are in different zones (prevents gate pileup)
+      if(aInYard !== oInYard) return;
       const od=Math.hypot(a.x-o.x,a.y-o.y)||.1;
       if(od<14){a.vx-=(o.x-a.x)/od*.24;a.vy-=(o.y-a.y)/od*.24;}
       else if(od<32&&a.st!=='flee'){a.vx+=(o.x-a.x)/od*.018;a.vy+=(o.y-a.y)/od*.018;}
@@ -481,6 +493,22 @@ function updateAnimals(lv){
     const ms=a.st==='flee'?(sheep?5.0:4.2):1.0;
     if(spd>ms){a.vx=a.vx/spd*ms;a.vy=a.vy/spd*ms;}
     if(spd>.08)a.ang=Math.atan2(a.vy,a.vx);
+
+    // Forward nudge: if animal has just entered race/pen zone and is nearly stopped,
+    // push it further in so it doesn't stall at the gate entrance
+    if(!aInYard && spd<0.4){
+      const sc=GEO.sc;
+      if(sc===1||sc===2||sc===4){
+        // Race-based levels: nudge right (further into race)
+        a.vx+=0.3;
+      } else if(sc===3){
+        // Draft: nudge toward correct pen based on group
+        const inPenA=inZ(a,GEO.zones.penA), inPenB=inZ(a,GEO.zones.penB);
+        if(inPenA||a.grp==='A') a.vy-=0.25;  // penA is up
+        if(inPenB||a.grp==='B') a.vy+=0.25;  // penB is down
+      }
+    }
+
     a.x+=a.vx; a.y+=a.vy; a.wb+=.13;
 
     applyWalls(a);
@@ -631,45 +659,30 @@ function drawZones(){
 
 function drawWalls(){
   for(const w of GEO.walls){
-    const open=w.gateId&&gateOpen[w.gateId];
-    const isDraft=w.gateId==='draft';
-    const isDefB=w.gateId==='defB';
+    const id=w.gateId||'';
+    const open=id&&gateOpen[id];
+    const isDraftGate=id==='gateA'||id==='gateB';
 
     if(w.dir==='h'){
-      if(isDefB){
-        // Deflector wall — draw only when closed (active)
-        if(!open){
-          ctx.fillStyle='#3a2a10';ctx.fillRect(w.x1,w.y-2,w.x2-w.x1,4);
-          ctx.strokeStyle='rgba(245,192,64,.4)';ctx.lineWidth=1;
-          ctx.strokeRect(w.x1,w.y-2,w.x2-w.x1,4);
-        }
-      } else {
-        ctx.fillStyle='#2e1c08';ctx.fillRect(w.x1,w.y-2,w.x2-w.x1,4);
-        ctx.strokeStyle='#5a3a18';ctx.lineWidth=.5;
-        ctx.strokeRect(w.x1,w.y-2,w.x2-w.x1,4);
-      }
+      ctx.fillStyle='#2e1c08';ctx.fillRect(w.x1,w.y-2,w.x2-w.x1,4);
+      ctx.strokeStyle='#5a3a18';ctx.lineWidth=.5;
+      ctx.strokeRect(w.x1,w.y-2,w.x2-w.x1,4);
       continue;
     }
 
-    // Vertical wall
     const cx2=w.x, midY=(w.y1+w.y2)/2;
-    if(isDraft){
-      // Draft gate — full height, always open, but show direction indicator
-      ctx.strokeStyle='rgba(39,174,96,.5)';ctx.lineWidth=2;ctx.setLineDash([4,5]);
-      ctx.beginPath();ctx.moveTo(cx2,w.y1);ctx.lineTo(cx2,w.y2);ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.fillStyle=GEO.draftDir==='A'?'rgba(80,200,110,.85)':'rgba(140,100,200,.85)';
-      ctx.font='bold 11px system-ui';ctx.textAlign='center';
-      ctx.fillText(GEO.draftDir==='A'?'▲ A':'▼ B',cx2,midY+4);
-      ctx.fillStyle='rgba(245,192,64,.6)';ctx.font='9px system-ui';
-      ctx.fillText('tap to switch',cx2,w.y1-5);
-    } else if(open){
+    if(open){
       ctx.strokeStyle='rgba(39,174,96,.55)';ctx.lineWidth=2;ctx.setLineDash([4,5]);
       ctx.beginPath();ctx.moveTo(cx2,w.y1);ctx.lineTo(cx2,w.y2);ctx.stroke();
       ctx.setLineDash([]);
-      ctx.fillStyle='rgba(39,174,96,.75)';ctx.font='9px system-ui';ctx.textAlign='center';
-      ctx.fillText('OPEN',cx2,midY);
-    } else if(w.gateId){
+      ctx.fillStyle='rgba(39,174,96,.85)';ctx.font='bold 10px system-ui';ctx.textAlign='center';
+      ctx.fillText(id==='gateA'?'\u25b2 A':id==='gateB'?'\u25bc B':'OPEN',cx2,midY+4);
+    } else if(isDraftGate){
+      ctx.fillStyle='#7a5228';ctx.fillRect(cx2-3,w.y1,6,w.y2-w.y1);
+      ctx.strokeStyle='rgba(200,140,50,.5)';ctx.lineWidth=1;ctx.strokeRect(cx2-3,w.y1,6,w.y2-w.y1);
+      ctx.fillStyle='rgba(200,130,40,.8)';ctx.font='bold 9px system-ui';ctx.textAlign='center';
+      ctx.fillText(id==='gateA'?'A':'B',cx2,midY+4);
+    } else if(id){
       ctx.fillStyle='#9a6830';ctx.fillRect(cx2-3,w.y1,6,w.y2-w.y1);
       ctx.strokeStyle='#c8a040';ctx.lineWidth=1;ctx.strokeRect(cx2-3,w.y1,6,w.y2-w.y1);
       for(let y=w.y1+10;y<w.y2-4;y+=12){
@@ -682,6 +695,11 @@ function drawWalls(){
       ctx.fillStyle='#2e1c08';ctx.fillRect(cx2-2,w.y1,4,w.y2-w.y1);
       ctx.strokeStyle='#5a3a18';ctx.lineWidth=.5;ctx.strokeRect(cx2-2,w.y1,4,w.y2-w.y1);
     }
+  }
+  if(GEO.sc===3&&GEO.draftRef){
+    const dr=GEO.draftRef;
+    ctx.fillStyle='rgba(245,192,64,.7)';ctx.font='9px system-ui';ctx.textAlign='center';
+    ctx.fillText('tap gate to switch',dr.x,dr.y-6);
   }
 }
 
@@ -806,22 +824,37 @@ function handleTap(mx,my){
   if(!gameActive)return;
   for(const w of GEO.walls){
     if(!w.gateId)continue;
-    const HIT=28;
-    const isDraft=w.gateId==='draft';
+    const HIT=30;
     const inRange = w.dir==='v'
       ? mx>w.x-HIT&&mx<w.x+HIT&&my>w.y1-HIT&&my<w.y2+HIT
       : my>w.y-HIT&&my<w.y+HIT&&mx>w.x1-HIT&&mx<w.x2+HIT;
-    if(inRange&&isDraft){
-      // Toggle draft direction
+    if(!inRange) continue;
+
+    const id=w.gateId;
+
+    // Draft gate toggle (sc3): tapping either gate A or B switches direction
+    if(id==='gateA'||id==='gateB'){
       GEO.draftDir=GEO.draftDir==='A'?'B':'A';
-      gateOpen.defB = GEO.draftDir==='B'; // open defB wall when going to B
-      msg(GEO.draftDir==='A'?'Draft: next animal → upper pen (A)':'Draft: next animal → lower pen (B)');
-      return;
-    } else if(inRange&&!isDraft&&w.gateId!=='defB'){
-      gateOpen[w.gateId]=!gateOpen[w.gateId];
-      msg(gateOpen[w.gateId]?'Gate opened — herd them through!':'Gate closed');
+      gateOpen.gateA=GEO.draftDir==='A';
+      gateOpen.gateB=GEO.draftDir==='B';
+      msg(GEO.draftDir==='A'?'Draft: next → upper pen (A)':'Draft: next → lower pen (B)');
       return;
     }
+
+    // Crush gate sequencing (sc2): exit cannot open while entry is open
+    if(id==='exit'&&gateOpen.entry){
+      msg('⚠ Close the entry gate first before opening the exit');
+      return;
+    }
+    if(id==='entry'&&gateOpen.exit){
+      msg('⚠ Close the exit gate first before opening the entry');
+      return;
+    }
+
+    // Normal toggle
+    gateOpen[id]=!gateOpen[id];
+    msg(gateOpen[id]?`Gate opened — herd them through!`:`Gate closed`);
+    return;
   }
 }
 wrap.addEventListener('click',e=>{const r=wrap.getBoundingClientRect();handleTap(e.clientX-r.left,e.clientY-r.top);});
