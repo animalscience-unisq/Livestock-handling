@@ -201,99 +201,93 @@ function rr(x,y,w,h,r){
 }
 
 // ── Level geometry ───────────────────────────────────────────
-// Layout type is determined by which of the 5 scenario types the level is (0-4 or 5-9 mod 5)
 function buildLevel(idx){
   gates=[];
-  const scenario=idx%5; // 0=open yards,1=race,2=crush,3=draft,4=loading
+  const scenario=idx%5;
   const g={scenario,idx};
-  const TOP=50, BOT=H-20;
+  const TOP=50, BOT=H-20, PAD=14;
 
   if(scenario===0){
-    // ── Open yards: pen1 (spawn) | wall+gate | pen2 (target) ──
+    // pen1 | solid wall with gate opening | pen2
+    // Wall is 6px wide. Gate is a hole in it.
     const wallX=Math.round(W*0.47);
-    const gateY=Math.round(H*0.25), gateH=Math.round(H*0.45);
-    g.pen1={x:14,y:TOP,w:wallX-14,h:BOT-TOP};
-    g.pen2={x:wallX+8,y:TOP,w:W-wallX-22,h:BOT-TOP};
-    g.wallX=wallX; g.gateY=gateY; g.gateH=gateH;
+    const gateY=Math.round(H*0.28), gateH=Math.round(H*0.42);
+    // pen1 goes right up to the wall; pen2 starts immediately after
+    g.pen1     ={x:PAD,      y:TOP, w:wallX-PAD,        h:BOT-TOP};
+    g.pen2     ={x:wallX+6,  y:TOP, w:W-wallX-6-PAD,    h:BOT-TOP};
+    g.wallX=wallX; g.wallW=6; g.gateY=gateY; g.gateH=gateH;
     g.spawnPen=g.pen1; g.targetZone=g.pen2;
-    // Gate sits flush in the wall gap — 8px wide, centred on wall
-    gates=[{id:'main',x:wallX,y:gateY,w:8,h:gateH,open:false,label:'Gate',vertical:true}];
+    gates=[{id:'main',x:wallX,y:gateY,w:6,h:gateH,open:false,label:'Gate',vertical:true}];
 
   } else if(scenario===1){
-    // ── Race entry: yard | funnel | race ──
-    const yardW=Math.round(W*0.46);
-    const raceH=60, raceY=Math.round(H/2-raceH/2);
-    const raceX=yardW+14;
-    g.yard={x:14,y:TOP,w:yardW,h:BOT-TOP};
-    g.race={x:raceX,y:raceY,w:W-raceX-14,h:raceH};
-    // Funnel walls guide animals into race mouth
-    g.funnelTop={x:yardW,y:TOP,w:8,h:raceY-TOP};
-    g.funnelBot={x:yardW,y:raceY+raceH,w:8,h:BOT-(raceY+raceH)};
+    // yard | funnel walls | gate | race (target)
+    // Key: funnel walls and gate must be at the SAME x so there's no gap
+    const yardR = Math.round(W*0.46); // right edge of yard = left edge of funnel/gate
+    const raceH=62, raceY=Math.round(H/2-raceH/2);
+    g.yard      ={x:PAD, y:TOP, w:yardR-PAD,     h:BOT-TOP};
+    g.race      ={x:yardR+6, y:raceY, w:W-yardR-6-PAD, h:raceH};
+    // Funnel walls sit exactly at yardR, same x as gate
+    g.funnelTop ={x:yardR,  y:TOP,         w:6, h:raceY-TOP};
+    g.funnelBot ={x:yardR,  y:raceY+raceH, w:6, h:BOT-(raceY+raceH)};
     g.spawnPen=g.yard; g.targetZone=g.race;
-    gates=[{id:'raceGate',x:raceX,y:raceY,w:8,h:raceH,open:false,label:'Race gate',vertical:true}];
+    // Gate is also at yardR — animals pass through the gap in the wall
+    gates=[{id:'raceGate',x:yardR,y:raceY,w:6,h:raceH,open:false,label:'Race gate',vertical:true}];
 
   } else if(scenario===2){
-    // ── Crush: yard → race → crush → exit ──
-    const yardW=Math.round(W*0.3);
+    const yardR  = Math.round(W*0.3);
     const raceH=54, raceY=Math.round(H/2-raceH/2);
-    const raceX=yardW+14, crushX=Math.round(W*0.62);
-    const crushH=96, crushW=72;
-    const crushY=Math.round(H/2-crushH/2);
-    const exitX=crushX+crushW;
-    g.yard={x:14,y:TOP,w:yardW,h:BOT-TOP};
-    g.race={x:raceX,y:raceY,w:crushX-raceX,h:raceH};
-    g.crush={x:crushX,y:crushY,w:crushW,h:crushH};
-    g.exit={x:exitX,y:raceY,w:W-exitX-14,h:raceH};
-    g.funnelTop={x:yardW,y:TOP,w:8,h:raceY-TOP};
-    g.funnelBot={x:yardW,y:raceY+raceH,w:8,h:BOT-(raceY+raceH)};
+    const raceX =yardR+6;
+    const crushX =Math.round(W*0.62), crushW=72, crushH=96;
+    const crushY =Math.round(H/2-crushH/2);
+    const exitX  =crushX+crushW+6;
+    g.yard  ={x:PAD,   y:TOP,   w:yardR-PAD,          h:BOT-TOP};
+    g.race  ={x:raceX, y:raceY, w:crushX-raceX,        h:raceH};
+    g.crush ={x:crushX,y:crushY,w:crushW,               h:crushH};
+    g.exit  ={x:exitX, y:raceY, w:W-exitX-PAD,          h:raceH};
+    g.funnelTop={x:yardR, y:TOP,         w:6, h:raceY-TOP};
+    g.funnelBot={x:yardR, y:raceY+raceH, w:6, h:BOT-(raceY+raceH)};
     g.spawnPen=g.yard; g.targetZone=g.exit;
     g.crushBounds=g.crush;
     gates=[
-      {id:'yardGate',  x:raceX,   y:raceY,  w:8,h:raceH,  open:false,label:'Yard gate',  vertical:true},
-      {id:'crushEntry',x:crushX,  y:crushY, w:8,h:crushH,  open:false,label:'Crush entry',vertical:true},
-      {id:'crushExit', x:exitX,   y:raceY,  w:8,h:raceH,   open:false,label:'Crush exit', vertical:true},
+      {id:'yardGate',  x:yardR,        y:raceY,  w:6,h:raceH,  open:false,label:'Yard gate',  vertical:true},
+      {id:'crushEntry',x:crushX,        y:crushY, w:6,h:crushH,  open:false,label:'Crush entry',vertical:true},
+      {id:'crushExit', x:crushX+crushW, y:raceY,  w:6,h:raceH,   open:false,label:'Crush exit', vertical:true},
     ];
 
   } else if(scenario===3){
-    // ── Draft: yard → race → draft gate → penLeft (top) + penRight (bot) ──
-    const yardW=Math.round(W*0.3);
+    const yardR  = Math.round(W*0.3);
     const raceH=56, raceY=Math.round(H/2-raceH/2);
-    const raceX=yardW+14, draftX=Math.round(W*0.7);
-    const penW=W-draftX-14;
-    const midY=Math.round(H/2);
-    g.yard={x:14,y:TOP,w:yardW,h:BOT-TOP};
-    g.race={x:raceX,y:raceY,w:draftX-raceX,h:raceH};
-    g.penLeft={x:draftX,y:TOP,w:penW,h:midY-TOP-4};
-    g.penRight={x:draftX,y:midY+4,w:penW,h:BOT-midY-4};
-    g.funnelTop={x:yardW,y:TOP,w:8,h:raceY-TOP};
-    g.funnelBot={x:yardW,y:raceY+raceH,w:8,h:BOT-(raceY+raceH)};
-    g.spawnPen=g.yard; g.targetZone=null; // dual target — handled in inTarget()
-    g.draftX=draftX; g.raceY=raceY; g.raceH=raceH;
-    g.midY=midY;
-    // For cattle levels: tag 0-4 = red = left, 5-9 = blue = right
-    // For sheep levels: white = left, grey = right
+    const raceX =yardR+6, draftX=Math.round(W*0.7);
+    const penW  =W-draftX-PAD, midY=Math.round(H/2);
+    g.yard    ={x:PAD,    y:TOP,       w:yardR-PAD,     h:BOT-TOP};
+    g.race    ={x:raceX,  y:raceY,     w:draftX-raceX,  h:raceH};
+    g.penLeft ={x:draftX+6, y:TOP,     w:penW,           h:midY-TOP-4};
+    g.penRight={x:draftX+6, y:midY+4,  w:penW,           h:BOT-midY-4};
+    g.funnelTop={x:yardR, y:TOP,         w:6, h:raceY-TOP};
+    g.funnelBot={x:yardR, y:raceY+raceH, w:6, h:BOT-(raceY+raceH)};
+    g.spawnPen=g.yard; g.targetZone=null;
+    g.draftX=draftX; g.raceY=raceY; g.raceH=raceH; g.midY=midY;
     gates=[
-      {id:'yardGate', x:raceX,  y:raceY, w:8,h:raceH, open:false,label:'Yard gate',vertical:true},
-      {id:'draftGate',x:draftX, y:raceY, w:8,h:raceH, open:true, label:'Draft',    vertical:true, dir:'left'},
+      {id:'yardGate', x:yardR,  y:raceY, w:6,h:raceH, open:false,label:'Yard gate',vertical:true},
+      {id:'draftGate',x:draftX, y:raceY, w:6,h:raceH, open:true, label:'Draft',    vertical:true, dir:'left'},
     ];
     g.draftGateRef=gates[1];
 
   } else {
-    // ── Truck loading: yard → race → ramp → truck ──
-    const yardW=Math.round(W*0.3);
-    const raceH=60, raceY=Math.round(H/2-raceH/2);
-    const raceX=yardW+14, rampX=Math.round(W*0.62), rampW=75, truckX=rampX+rampW;
-    g.yard={x:14,y:TOP,w:yardW,h:BOT-TOP};
-    g.race={x:raceX,y:raceY,w:rampX-raceX,h:raceH};
-    g.ramp={x:rampX,y:raceY,w:rampW,h:raceH};
-    g.truck={x:truckX,y:Math.round(H/2-90),w:W-truckX-10,h:180};
-    g.funnelTop={x:yardW,y:TOP,w:8,h:raceY-TOP};
-    g.funnelBot={x:yardW,y:raceY+raceH,w:8,h:BOT-(raceY+raceH)};
-    g.baulkZone={x:rampX,y:raceY,w:rampW,h:raceH};
+    const yardR =Math.round(W*0.3);
+    const raceH =60, raceY=Math.round(H/2-raceH/2);
+    const raceX =yardR+6, rampX=Math.round(W*0.62), rampW=75, truckX=rampX+rampW+6;
+    g.yard  ={x:PAD,   y:TOP,   w:yardR-PAD,        h:BOT-TOP};
+    g.race  ={x:raceX, y:raceY, w:rampX-raceX,      h:raceH};
+    g.ramp  ={x:rampX, y:raceY, w:rampW,             h:raceH};
+    g.truck ={x:truckX,y:Math.round(H/2-90),w:W-truckX-10,h:180};
+    g.funnelTop={x:yardR, y:TOP,         w:6, h:raceY-TOP};
+    g.funnelBot={x:yardR, y:raceY+raceH, w:6, h:BOT-(raceY+raceH)};
+    g.baulkZone={x:rampX, y:raceY, w:rampW, h:raceH};
     g.spawnPen=g.yard; g.targetZone=g.truck;
     gates=[
-      {id:'yardGate',x:raceX, y:raceY,w:8,h:raceH,open:false,label:'Yard gate',vertical:true},
-      {id:'rampGate',x:rampX, y:raceY,w:8,h:raceH,open:false,label:'Ramp gate',vertical:true},
+      {id:'yardGate',x:yardR,  y:raceY,w:6,h:raceH,open:false,label:'Yard gate',vertical:true},
+      {id:'rampGate',x:rampX,  y:raceY,w:6,h:raceH,open:false,label:'Ramp gate',vertical:true},
     ];
   }
 
@@ -374,72 +368,68 @@ function getWalkableRect(a){
 }
 
 function applyWalls(a){
-  const pad=a.size+2;
+  const r=a.size+1; // collision radius
   const g=levelState;
   const sc=g.scenario;
 
-  // ── Scenario 0: wall between pen1 and pen2 ──
   if(sc===0){
+    // ── Two pens with a wall. Gate is a hole in the wall. ──
     const gate=gates.find(gt=>gt.id==='main');
-    const wallX=g.wallX;
-    const wallRight=wallX+8;
+    const wx=g.wallX, ww=g.wallW;
 
-    if(!gate.open){
-      // Solid wall when gate closed — block crossing in either direction
-      if(a.x<wallX&&a.x+pad>wallX){
-        // Animal in pen1 hitting the wall from the left
-        a.x=wallX-pad; a.vx=-Math.abs(a.vx)*0.5;
-      }
-      if(a.x>wallRight&&a.x-pad<wallRight){
-        // Animal in pen2 hitting the wall from the right
-        a.x=wallRight+pad; a.vx=Math.abs(a.vx)*0.5;
-      }
+    // Full wall boundary: any animal whose centre crosses wx must be stopped
+    // UNLESS the gate is open AND the animal is within the gate's y-range
+    const inGateGap = gate.open && a.y>g.gateY && a.y<g.gateY+g.gateH;
+
+    if(!inGateGap){
+      // Coming from left
+      if(a.x+r>wx && a.x<wx+ww){ a.x=wx-r; a.vx=Math.min(a.vx,-0)*0.5; }
+      // Coming from right
+      if(a.x-r<wx+ww && a.x>wx){ a.x=wx+ww+r; a.vx=Math.max(a.vx,0)*0.5; }
     }
-    // FIX: clamp each animal only to the pen it is currently in
-    // Determine which pen the animal belongs to by its current x position
-    if(a.x<=wallX){
-      // In pen1 (or crossing left — snap to pen1)
-      clampRect(a,g.pen1,pad);
-    } else {
-      // In pen2 (crossed through open gate)
-      clampRect(a,g.pen2,pad);
-    }
-    return; // skip remaining wall logic for scenario 0
+
+    // Hard outer pen bounds
+    const inPen2 = a.x > wx+ww;
+    if(inPen2) clampRect(a,g.pen2,r);
+    else       clampRect(a,g.pen1,r);
+    return;
   }
 
-  // ── Gate walls for scenarios 1-4 ──
+  // ── Scenarios 1-4: gates and funnel walls are all at the same x ──
+  // Rule: a wall at x=wx blocks passage UNLESS a gate at that x is open
+  // and the animal's y is within that gate's y-range.
+
+  // Build a list of wall segments: each segment is a y-range that is solid
+  // Collect all vertical walls (funnels + closed gate segments)
+  const wallSegs=[]; // {x, y1, y2}
+
+  // Funnel walls are always solid
+  if(g.funnelTop && g.funnelTop.h>0){
+    wallSegs.push({x:g.funnelTop.x, y1:g.funnelTop.y, y2:g.funnelTop.y+g.funnelTop.h});
+  }
+  if(g.funnelBot && g.funnelBot.h>0){
+    wallSegs.push({x:g.funnelBot.x, y1:g.funnelBot.y, y2:g.funnelBot.y+g.funnelBot.h});
+  }
+  // Gates: if closed, they are a wall segment too; if open, they are a gap (no segment added)
   gates.forEach(gt=>{
-    if(gt.open||gt.id==='draftGate') return;
-    if(!gt.vertical) return;
-    const gLeft=gt.x;
-    const gRight=gt.x+gt.w;
-    // Only block if animal is within the gate's y-range
-    if(a.y<gt.y-a.size||a.y>gt.y+gt.h+a.size) return;
-    // Approaching from left → bounce back left
-    if(a.vx>=0&&a.x+pad>gLeft&&a.x<gRight){
-      a.x=gLeft-pad; a.vx=-Math.abs(a.vx)*0.5;
-    }
-    // Approaching from right → bounce back right
-    if(a.vx<=0&&a.x-pad<gRight&&a.x>gLeft){
-      a.x=gRight+pad; a.vx=Math.abs(a.vx)*0.5;
+    if(gt.id==='draftGate') return; // draft gate handled separately
+    if(!gt.open){
+      wallSegs.push({x:gt.x, y1:gt.y, y2:gt.y+gt.h});
     }
   });
 
-  // ── Funnel walls (scenarios 1-4): only apply to animals still LEFT of the funnel ──
-  // Animals that have already passed through must not be pushed back
-  if(g.funnelTop&&a.x<=g.funnelTop.x+g.funnelTop.w+a.size){
-    if(a.x+pad>g.funnelTop.x&&a.y<g.funnelTop.y+g.funnelTop.h){
-      a.x=g.funnelTop.x-pad; a.vx=-Math.abs(a.vx)*0.5;
-    }
-  }
-  if(g.funnelBot&&a.x<=g.funnelBot.x+g.funnelBot.w+a.size){
-    if(a.x+pad>g.funnelBot.x&&a.y>g.funnelBot.y){
-      a.x=g.funnelBot.x-pad; a.vx=-Math.abs(a.vx)*0.5;
-    }
+  // Apply all wall segments
+  for(const seg of wallSegs){
+    if(a.y+r<seg.y1 || a.y-r>seg.y2) continue; // animal not in this segment's y-range
+    const wx=seg.x, ww=6;
+    // Animal approaching from left
+    if(a.x+r>wx && a.x<=wx+ww){ a.x=wx-r; a.vx=Math.min(a.vx,0); }
+    // Animal approaching from right
+    if(a.x-r<wx+ww && a.x>=wx){ a.x=wx+ww+r; a.vx=Math.max(a.vx,0); }
   }
 
-  // ── Global bounds ──
-  clampRect(a,{x:2,y:50,w:W-4,h:H-54},pad);
+  // Global bounds
+  clampRect(a,{x:2,y:50,w:W-4,h:H-54},r);
 }
 
 function clampRect(a,r,pad){
