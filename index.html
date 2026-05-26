@@ -220,12 +220,22 @@ function buildGeo(lv){
     GEO.walls.push(vwall(yw, ry,  ry+rh,   'yard'));
     GEO.walls.push(vwall(cx, cy,  cy+ch,   'entry'));
     GEO.walls.push(vwall(ex, ry,  ry+rh,   'exit'));
+    // Race corridor top/bottom
     GEO.walls.push(hwall(ry,    yw, cx));
     GEO.walls.push(hwall(ry+rh, yw, cx));
+    // Crush top/bottom
     GEO.walls.push(hwall(cy,    cx, ex));
     GEO.walls.push(hwall(cy+ch, cx, ex));
+    // Exit corridor top/bottom
     GEO.walls.push(hwall(ry,    ex, R));
     GEO.walls.push(hwall(ry+rh, ex, R));
+    // Seal the gap corners where race meets crush:
+    // Left side of crush: wall segments above and below the race opening
+    GEO.walls.push(hwall(cy,    cx-2, cx+2));        // crush top-left corner cap
+    GEO.walls.push(hwall(cy+ch, cx-2, cx+2));        // crush bottom-left corner cap
+    // Right side of crush: seal above and below exit corridor at ex
+    GEO.walls.push(vwall(ex, cy,    ry,     null));  // above exit, left of exit wall
+    GEO.walls.push(vwall(ex, ry+rh, cy+ch,  null));  // below exit, left of exit wall
     GEO.gates={yard:false, entry:false, exit:false};
     GEO.crushZone=GEO.zones.crush;
     GEO.spawnZone=GEO.zones.yard;
@@ -488,7 +498,8 @@ function updateAnimals(lv){
 
     // Check placed
     if(GEO.targetFn(a)){
-      a.placed=true;a.vx=0;a.vy=0;
+      a.placed=true; a.vx=0; a.vy=0;
+      a.fadeOut=1.0;  // start fade — animal will disappear
       movedCount++;
       liveScore+=50;
       document.getElementById('hSc').textContent=movedCount;
@@ -496,6 +507,11 @@ function updateAnimals(lv){
       msg(`+50 pts — placed! (${rem} left)`);
       if(movedCount>=animals.length) endGame(true);
     }
+  });
+
+  // Tick down fade for placed animals
+  animals.forEach(a=>{
+    if(a.placed && a.fadeOut>0) a.fadeOut=Math.max(0, a.fadeOut-0.06);
   });
 
   herdStress=Math.min(10,herdStress);
@@ -677,7 +693,13 @@ function drawWalls(){
 }
 
 function drawAnimal(a){
-  ctx.save();ctx.translate(a.x,a.y);ctx.rotate(a.ang+Math.PI/2);
+  // Skip completely faded out animals
+  if(a.placed && a.fadeOut<=0) return;
+
+  ctx.save();
+  // Apply fade during disappear
+  if(a.placed && a.fadeOut<1) ctx.globalAlpha=a.fadeOut;
+  ctx.translate(a.x,a.y);ctx.rotate(a.ang+Math.PI/2);
   const sz=a.sz,wb=Math.sin(a.wb)*(a.st==='flee'?.1:.03);
   let ring=a.placed?'#27ae60':'#f5c040';
   if(a.st==='alert')ring='#e67e22';
