@@ -165,45 +165,38 @@ const LEVELS=[
 let GEO={};   // geometry for current level
 
 function buildGeo(lv){
-  const sc=lv.id%5;  // scenario 0-4
-  const T=42, B=H-10, L=8, R=W-8;  // usable area
+  const sc=lv.id%5;
+  const T=42, B=H-10, L=8, R=W-8;
 
-  // Helper: make a zone rect
-  const z=(x,y,w,h)=>({x,y,w,h});
-
-  // Helper: vertical wall segment
   const vwall=(x,y1,y2,gateId=null)=>({x,y1,y2,gateId,dir:'v'});
-
-  // Helper: horizontal wall segment
   const hwall=(y,x1,x2,gateId=null)=>({y,x1,x2,gateId,dir:'h'});
 
   GEO={sc, walls:[], zones:{}, spawnZone:null, targetFn:null,
        gates:{}, draftRef:null, crushZone:null, baulkZone:null};
 
   if(sc===0){
-    // ── TWO PENS: spawn pen left, holding pen right ──
+    // ── TWO PENS ──
     const mx=Math.round(W/2);
-    const gy=Math.round(H*0.25), gh=Math.round(H*0.5);
-    GEO.zones.spawn ={x:L,   y:T, w:mx-L,   h:B-T};
-    GEO.zones.target={x:mx,  y:T, w:R-mx,   h:B-T};
-    GEO.walls.push(vwall(mx, T,   gy,    null));
-    GEO.walls.push(vwall(mx, gy,  gy+gh, 'gate1'));
-    GEO.walls.push(vwall(mx, gy+gh, B,   null));
+    const gh=Math.round(H*0.65);             // gate opening: 65% of height
+    const gy=Math.round((H-gh)/2);
+    GEO.zones.spawn ={x:L,  y:T, w:mx-L,  h:B-T};
+    GEO.zones.target={x:mx, y:T, w:R-mx,  h:B-T};
+    GEO.walls.push(vwall(mx, T,    gy,     null));
+    GEO.walls.push(vwall(mx, gy,   gy+gh,  'gate1'));
+    GEO.walls.push(vwall(mx, gy+gh, B,     null));
     GEO.gates.gate1=false;
-    GEO.spawnZone =GEO.zones.spawn;
-    GEO.targetFn  =a=>inZ(a,GEO.zones.target);
+    GEO.spawnZone=GEO.zones.spawn;
+    GEO.targetFn =a=>inZ(a,GEO.zones.target);
 
   }else if(sc===1){
     // ── YARD → RACE ──
-    const yw=Math.round(W*0.45);
-    const rh=64, ry=Math.round((H-rh)/2);
-    GEO.zones.yard={x:L,  y:T,  w:yw-L,  h:B-T};
-    GEO.zones.race={x:yw, y:ry, w:R-yw,  h:rh};
-    // Vertical funnel walls (block passage except through gate gap)
-    GEO.walls.push(vwall(yw, T,  ry,     null));   // above race mouth
-    GEO.walls.push(vwall(yw, ry+rh, B,   null));   // below race mouth
-    GEO.walls.push(vwall(yw, ry, ry+rh,  'gate1')); // gate
-    // Horizontal walls top and bottom of race to keep animals inside the corridor
+    const yw=Math.round(W*0.42);             // yard takes 42% of width
+    const rh=110, ry=Math.round((H-rh)/2);  // race 110px tall
+    GEO.zones.yard={x:L,  y:T,  w:yw-L, h:B-T};
+    GEO.zones.race={x:yw, y:ry, w:R-yw, h:rh};
+    GEO.walls.push(vwall(yw, T,    ry,    null));
+    GEO.walls.push(vwall(yw, ry+rh, B,   null));
+    GEO.walls.push(vwall(yw, ry,  ry+rh, 'gate1'));
     GEO.walls.push(hwall(ry,    yw, R));
     GEO.walls.push(hwall(ry+rh, yw, R));
     GEO.gates.gate1=false;
@@ -212,28 +205,25 @@ function buildGeo(lv){
 
   }else if(sc===2){
     // ── YARD → RACE → CRUSH → EXIT ──
-    const yw=Math.round(W*0.28);
-    const rh=54, ry=Math.round((H-rh)/2);
-    const cx=Math.round(W*0.58), cw=68, ch=90;
+    const yw=Math.round(W*0.26);
+    const rh=90, ry=Math.round((H-rh)/2);   // race 90px tall
+    const cx=Math.round(W*0.54);
+    const cw=90, ch=130;                     // crush wider and taller
     const cy=Math.round((H-ch)/2);
     const ex=cx+cw;
     GEO.zones.yard ={x:L,  y:T,  w:yw-L,  h:B-T};
     GEO.zones.race ={x:yw, y:ry, w:cx-yw, h:rh};
     GEO.zones.crush={x:cx, y:cy, w:cw,     h:ch};
     GEO.zones.exit ={x:ex, y:ry, w:R-ex,   h:rh};
-    // Vertical funnel + gates
-    GEO.walls.push(vwall(yw, T,  ry,     null));
-    GEO.walls.push(vwall(yw, ry+rh, B,   null));
-    GEO.walls.push(vwall(yw, ry, ry+rh,  'yard'));
-    GEO.walls.push(vwall(cx, cy, cy+ch,  'entry'));
-    GEO.walls.push(vwall(ex, ry, ry+rh,  'exit'));
-    // Horizontal walls: top and bottom of race corridor
+    GEO.walls.push(vwall(yw, T,   ry,      null));
+    GEO.walls.push(vwall(yw, ry+rh, B,     null));
+    GEO.walls.push(vwall(yw, ry,  ry+rh,   'yard'));
+    GEO.walls.push(vwall(cx, cy,  cy+ch,   'entry'));
+    GEO.walls.push(vwall(ex, ry,  ry+rh,   'exit'));
     GEO.walls.push(hwall(ry,    yw, cx));
     GEO.walls.push(hwall(ry+rh, yw, cx));
-    // Horizontal walls: top and bottom of crush (above and below crush opening)
     GEO.walls.push(hwall(cy,    cx, ex));
     GEO.walls.push(hwall(cy+ch, cx, ex));
-    // Horizontal walls: top and bottom of exit corridor
     GEO.walls.push(hwall(ry,    ex, R));
     GEO.walls.push(hwall(ry+rh, ex, R));
     GEO.gates={yard:false, entry:false, exit:false};
@@ -242,50 +232,36 @@ function buildGeo(lv){
     GEO.targetFn =a=>inZ(a,GEO.zones.exit);
 
   }else if(sc===3){
-    // ── YARD → RACE → TWO PENS (A top, B bottom) ──
-    // Simple approach: the wall at dx has TWO gate openings.
-    // Gate A covers the top half of the wall (leads to penA).
-    // Gate B covers the bottom half (leads to penB).
-    // Each pen opening is rh/2 tall — big enough for one animal.
-    // Only one is open at a time = the draft direction.
-    const yw=Math.round(W*0.28);
-    const rh=80;                              // tall race so each half-gate is 40px
+    // ── YARD → RACE → PEN A (top) + PEN B (bottom) ──
+    // Two large gate openings at dx — gateA (top half) leads to penA,
+    // gateB (bottom half) leads to penB. Only one open at a time.
+    const yw=Math.round(W*0.26);
+    const rh=120;                             // race 120px — each gate opening = 60px
     const ry=Math.round((H-rh)/2);
-    const dx=Math.round(W*0.68);
+    const dx=Math.round(W*0.65);
     const midy=Math.round(H/2);
     const pw=R-dx;
-    const gateHA=Math.round(rh/2);           // height of each pen gate opening = 40px
-    // Pen A occupies upper screen, pen B lower screen
-    GEO.zones.yard ={x:L,   y:T,      w:yw-L,  h:B-T};
-    GEO.zones.race ={x:yw,  y:ry,     w:dx-yw, h:rh};
-    GEO.zones.penA ={x:dx,  y:T,      w:pw,     h:midy-T};
-    GEO.zones.penB ={x:dx,  y:midy,   w:pw,     h:B-midy};
-    // Funnel + yard gate
+    const gateHA=Math.round(rh/2);           // 60px per gate
+    GEO.zones.yard ={x:L,  y:T,      w:yw-L, h:B-T};
+    GEO.zones.race ={x:yw, y:ry,     w:dx-yw,h:rh};
+    GEO.zones.penA ={x:dx, y:T,      w:pw,    h:midy-T};
+    GEO.zones.penB ={x:dx, y:midy,   w:pw,    h:B-midy};
     GEO.walls.push(vwall(yw, T,    ry,    null));
     GEO.walls.push(vwall(yw, ry+rh, B,   null));
-    GEO.walls.push(vwall(yw, ry, ry+rh,  'yard'));
-    // Race corridor horizontal walls
+    GEO.walls.push(vwall(yw, ry,  ry+rh, 'yard'));
     GEO.walls.push(hwall(ry,    yw, dx));
     GEO.walls.push(hwall(ry+rh, yw, dx));
-    // Right-side wall at dx: solid above penA gate, solid between gates, solid below penB gate
-    const pyA1=T,   pyA2=ry;                 // solid above race (to top of screen)
-    const pyB1=ry+rh, pyB2=B;               // solid below race (to bottom of screen)
-    const pyMid1=ry+gateHA, pyMid2=ry+gateHA; // midpoint = where gates meet
-    GEO.walls.push(vwall(dx, T,          ry,       null));  // above race — solid
-    GEO.walls.push(vwall(dx, ry+rh,      B,        null));  // below race — solid
-    // The wall between the two gate openings (solid strip at the midpoint)
-    GEO.walls.push(vwall(dx, ry+gateHA-2, ry+gateHA+2, null)); // 4px solid divider
-    // Gate A: top half of race wall → leads to penA (upper)
-    GEO.walls.push(vwall(dx, ry,          ry+gateHA-2, 'gateA'));
-    // Gate B: bottom half of race wall → leads to penB (lower)
-    GEO.walls.push(vwall(dx, ry+gateHA+2, ry+rh,       'gateB'));
-    // Horizontal divider between penA and penB (full width, at midy)
-    GEO.walls.push(hwall(midy, dx, R, null));
-    GEO.gates={yard:false, gateA:true, gateB:false};  // A open by default
+    GEO.walls.push(vwall(dx, T,          ry,              null));  // solid above race
+    GEO.walls.push(vwall(dx, ry+rh,      B,               null));  // solid below race
+    GEO.walls.push(vwall(dx, ry+gateHA-3, ry+gateHA+3,    null));  // 6px divider strip
+    GEO.walls.push(vwall(dx, ry,          ry+gateHA-3,    'gateA')); // top gate → penA
+    GEO.walls.push(vwall(dx, ry+gateHA+3, ry+rh,          'gateB')); // bottom gate → penB
+    GEO.walls.push(hwall(midy, dx, R, null));  // divider between penA and penB
+    GEO.gates={yard:false, gateA:true, gateB:false};
     GEO.draftDir='A';
     GEO.draftRef={x:dx, y:ry, h:rh, gateHA};
     GEO.spawnZone=GEO.zones.yard;
-    GEO.targetFn =a=>{
+    GEO.targetFn=a=>{
       if(a.grp==='A') return inZ(a,GEO.zones.penA);
       if(a.grp==='B') return inZ(a,GEO.zones.penB);
       return false;
@@ -293,21 +269,19 @@ function buildGeo(lv){
 
   }else{
     // ── YARD → RACE → RAMP → TRUCK ──
-    const yw=Math.round(W*0.28);
-    const rh=60, ry=Math.round((H-rh)/2);
-    const rpx=Math.round(W*0.58), rpw=72;
+    const yw=Math.round(W*0.26);
+    const rh=100, ry=Math.round((H-rh)/2);  // race 100px tall
+    const rpx=Math.round(W*0.55), rpw=90;   // ramp wider
     const tkx=rpx+rpw;
     GEO.zones.yard ={x:L,   y:T,  w:yw-L,   h:B-T};
     GEO.zones.race ={x:yw,  y:ry, w:rpx-yw, h:rh};
     GEO.zones.ramp ={x:rpx, y:ry, w:rpw,     h:rh};
-    GEO.zones.truck={x:tkx, y:Math.round((H-180)/2), w:R-tkx, h:180};
+    GEO.zones.truck={x:tkx, y:Math.round((H-200)/2), w:R-tkx, h:200};
     GEO.baulkZone  =GEO.zones.ramp;
-    // Funnel + gates
-    GEO.walls.push(vwall(yw, T,  ry,    null));
-    GEO.walls.push(vwall(yw, ry+rh, B,  null));
+    GEO.walls.push(vwall(yw,  T,  ry,    null));
+    GEO.walls.push(vwall(yw,  ry+rh, B,  null));
     GEO.walls.push(vwall(yw,  ry, ry+rh, 'yard'));
     GEO.walls.push(vwall(rpx, ry, ry+rh, 'ramp'));
-    // Horizontal walls: race corridor + ramp
     GEO.walls.push(hwall(ry,    yw, tkx));
     GEO.walls.push(hwall(ry+rh, yw, tkx));
     GEO.gates={yard:false, ramp:false};
@@ -315,7 +289,6 @@ function buildGeo(lv){
     GEO.targetFn =a=>inZ(a,GEO.zones.truck);
   }
 
-  // Initialise gateOpen from GEO.gates
   gateOpen={};
   for(const k in GEO.gates) gateOpen[k]=GEO.gates[k];
 }
