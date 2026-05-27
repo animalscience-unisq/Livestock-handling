@@ -143,16 +143,16 @@ let pname='Handler';
    LEVEL DEFINITIONS
 ═══════════════════════════════════════════════════════════════ */
 const LEVELS=[
-  {id:0, name:'C1 · Open yards',   sp:'cow',   n:8,  t:100},
-  {id:1, name:'C2 · Race entry',   sp:'cow',   n:9,  t:90},
-  {id:2, name:'C3 · Crush',        sp:'cow',   n:8,  t:100},
-  {id:3, name:'C4 · Drafting',     sp:'cow',   n:10, t:90},
-  {id:4, name:'C5 · Loading',      sp:'cow',   n:10, t:90},
-  {id:5, name:'S1 · Open yards',   sp:'sheep', n:10, t:100},
-  {id:6, name:'S2 · Race entry',   sp:'sheep', n:12, t:90},
-  {id:7, name:'S3 · Crush',        sp:'sheep', n:10, t:100},
-  {id:8, name:'S4 · Drafting',     sp:'sheep', n:12, t:90},
-  {id:9, name:'S5 · Loading',      sp:'sheep', n:12, t:90},
+  {id:0, name:'C1 · Open yards',   sp:'cow',   n:8,  t:200},
+  {id:1, name:'C2 · Race entry',   sp:'cow',   n:9,  t:180},
+  {id:2, name:'C3 · Crush',        sp:'cow',   n:8,  t:200},
+  {id:3, name:'C4 · Drafting',     sp:'cow',   n:10, t:180},
+  {id:4, name:'C5 · Loading',      sp:'cow',   n:10, t:180},
+  {id:5, name:'S1 · Open yards',   sp:'sheep', n:10, t:200},
+  {id:6, name:'S2 · Race entry',   sp:'sheep', n:12, t:180},
+  {id:7, name:'S3 · Crush',        sp:'sheep', n:10, t:200},
+  {id:8, name:'S4 · Drafting',     sp:'sheep', n:12, t:180},
+  {id:9, name:'S5 · Loading',      sp:'sheep', n:12, t:180},
 ];
 
 /* ═══════════════════════════════════════════════════════════════
@@ -559,7 +559,7 @@ function drawZones(){
   const lv=LEVELS[curLv];
   const sheep=lv.sp==='sheep';
 
-  // ── helpers ──────────────────────────────────────────────────
+  // ── helpers ─────────────────────────────────────────────────
   function pen(z,dark=false){
     if(!z||z.w<=0||z.h<=0)return;
     ctx.fillStyle=dark?'#5a3e22':'#6b4a2a';
@@ -572,24 +572,29 @@ function drawZones(){
     ctx.strokeStyle='#7a5430';ctx.lineWidth=1.5;strokeRR(z.x,z.y,z.w,z.h,4);
   }
 
-  // Draw a simple flat race rectangle
   function raceFlat(z){
     if(!z)return;
     ctx.fillStyle='#3c2a12';fillRR(z.x,z.y,z.w,z.h,2);
     ctx.strokeStyle='#6a4820';ctx.lineWidth=2;strokeRR(z.x,z.y,z.w,z.h,2);
   }
 
-  // Draw a tapered trapezoid corridor:
-  // left side is wideH tall centred on midY, right side is narrowH tall centred on midY
-  function raceTaper(x0,x1,midY,wideH,narrowH,fillCol,strokeCol){
-    const ly0=midY-wideH/2, ly1=midY+wideH/2;  // left tall
-    const ry0=midY-narrowH/2, ry1=midY+narrowH/2;  // right narrow
+  // Tapered trapezoid: left side wideH centred on midY, right side narrowH centred on midY
+  function taper(x0,x1,midY,wideH,narrowH,fillCol,strokeCol){
+    const ly0=midY-wideH/2,  ly1=midY+wideH/2;
+    const ry0=midY-narrowH/2, ry1=midY+narrowH/2;
     ctx.fillStyle=fillCol;
     ctx.beginPath();
     ctx.moveTo(x0,ly0);ctx.lineTo(x1,ry0);
     ctx.lineTo(x1,ry1);ctx.lineTo(x0,ly1);
     ctx.closePath();ctx.fill();
     ctx.strokeStyle=strokeCol;ctx.lineWidth=2;ctx.stroke();
+  }
+
+  // Bilateral funnel: narrow in the middle, wide on both sides
+  // Draws TWO trapezoids meeting at the gate x position
+  function bilateralFunnel(gateX, midY, leftWideH, rightWideH, narrowH, funnelW, fillCol, strokeCol){
+    taper(gateX-funnelW, gateX, midY, leftWideH,  narrowH, fillCol, strokeCol);
+    taper(gateX,         gateX+funnelW, midY, narrowH, rightWideH, fillCol, strokeCol);
   }
 
   function target(z,label){
@@ -599,37 +604,56 @@ function drawZones(){
     ctx.fillText(label,z.x+z.w/2,z.y+z.h/2+4);
   }
 
+  // ── sc0: Open yards ─────────────────────────────────────────
   if(sc===0){
     pen(GEO.zones.spawn);
     pen(GEO.zones.target,true);
+    // Bilateral funnel at the wall gate (centred on wall x)
+    const sp=GEO.zones.spawn, tg=GEO.zones.target;
+    const mx=sp.x+sp.w; // wall x
+    const midY=sp.y+sp.h/2;
+    const gh=GEO.walls.find(w=>w.gateId==='gate1');
+    if(gh){
+      const gateH=gh.y2-gh.y1;
+      bilateralFunnel(mx, midY, sp.h*0.5, tg.h*0.5, gateH, 55, '#4a3018','#6a4820');
+    }
     target(GEO.zones.target,'HOLDING PEN');
 
+  // ── sc1: Race entry ─────────────────────────────────────────
   }else if(sc===1){
     pen(GEO.zones.yard);
     const rc=GEO.zones.race, yd=GEO.zones.yard;
-    const midY=(rc.y+rc.y+rc.h)/2;
-    // Funnel from yard (full height) tapers to race height at race entrance
-    const funnelW=60; // width of tapered funnel section
-    raceTaper(yd.x+yd.w, rc.x+funnelW, midY, yd.h*0.7, rc.h, '#3c2a12','#6a4820');
+    const midY=rc.y+rc.h/2;
+    const gw=GEO.walls.find(w=>w.gateId==='gate1');
+    const gateH=gw?gw.y2-gw.y1:rc.h;
+    // Bilateral funnel at race gate: yard side wide → gate narrow → race side (race h)
+    bilateralFunnel(yd.x+yd.w, midY, yd.h*0.55, rc.h, gateH, 60, '#3c2a12','#6a4820');
     raceFlat(rc);
     target(rc,'RACE');
 
+  // ── sc2: Crush ──────────────────────────────────────────────
   }else if(sc===2){
     pen(GEO.zones.yard);
     const rc=GEO.zones.race, cr=GEO.zones.crush, ex=GEO.zones.exit;
-    const midY=(rc.y+rc.y+rc.h)/2;
-    const crMidY=(cr.y+cr.y+cr.h)/2;
+    const midY=rc.y+rc.h/2;
+    const crMidY=cr.y+cr.h/2;
 
-    // Race corridor (flat)
+    // Bilateral funnel at yard→race gate
+    const gwY=GEO.walls.find(w=>w.gateId==='yard');
+    const yardGateH=gwY?gwY.y2-gwY.y1:rc.h;
+    bilateralFunnel(rc.x, midY, GEO.zones.yard.h*0.5, rc.h, yardGateH, 55, '#3c2a12','#6a4820');
+
+    // Race corridor
     raceFlat(rc);
 
-    // Funnel from race into crush (race height → crush height)
-    raceTaper(rc.x+rc.w-30, cr.x, midY, rc.h, cr.h, '#2e1e0a','#8a6030');
+    // Bilateral funnel at crush entry: race h → entry gate h → crush h
+    const gwE=GEO.walls.find(w=>w.gateId==='entry');
+    const entryGateH=gwE?gwE.y2-gwE.y1:cr.h;
+    bilateralFunnel(cr.x, midY, rc.h, cr.h, entryGateH, 45, '#2e1e0a','#8a6030');
 
     // Crush box
     ctx.fillStyle='#1e1408';fillRR(cr.x,cr.y,cr.w,cr.h,3);
     ctx.strokeStyle='#c8a040';ctx.lineWidth=2.5;strokeRR(cr.x,cr.y,cr.w,cr.h,3);
-    // Crush rails
     ctx.strokeStyle='rgba(200,160,60,.25)';ctx.lineWidth=1;
     for(let y=cr.y+14;y<cr.y+cr.h-4;y+=14){
       ctx.beginPath();ctx.moveTo(cr.x+4,y);ctx.lineTo(cr.x+cr.w-4,y);ctx.stroke();
@@ -637,18 +661,26 @@ function drawZones(){
     ctx.fillStyle='rgba(245,192,64,.7)';ctx.font='bold 10px system-ui';ctx.textAlign='center';
     ctx.fillText('CRUSH',cr.x+cr.w/2,cr.y-5);
 
-    // Funnel from crush back to exit race (crush height → race height)
-    raceTaper(cr.x+cr.w, ex.x+30, crMidY, cr.h, rc.h, '#2e1e0a','#8a6030');
+    // Bilateral funnel at crush exit: crush h → exit gate h → exit corridor h
+    const gwX=GEO.walls.find(w=>w.gateId==='exit');
+    const exitGateH=gwX?gwX.y2-gwX.y1:rc.h;
+    bilateralFunnel(cr.x+cr.w, crMidY, cr.h, rc.h, exitGateH, 45, '#2e1e0a','#8a6030');
 
     // Exit corridor
     raceFlat(ex);
     target(ex,'EXIT');
 
+  // ── sc3: Drafting ────────────────────────────────────────────
   }else if(sc===3){
     pen(GEO.zones.yard);
     const rc=GEO.zones.race;
     const midY=rc.y+rc.h/2;
     const dr=GEO.draftRef;
+
+    // Bilateral funnel at yard→race gate
+    const gwY=GEO.walls.find(w=>w.gateId==='yard');
+    const yardGateH=gwY?gwY.y2-gwY.y1:rc.h;
+    bilateralFunnel(rc.x, midY, GEO.zones.yard.h*0.5, rc.h, yardGateH, 55, '#3c2a12','#6a4820');
 
     // Race corridor
     raceFlat(rc);
@@ -664,50 +696,55 @@ function drawZones(){
     ctx.fillStyle='rgba(160,120,200,.6)';ctx.font='11px system-ui';ctx.textAlign='center';
     ctx.fillText(sheep?'GREY ↓':'BLUE ↓',pb.x+pb.w/2,pb.y+pb.h-6);
 
-    // Gate funnel guides — angled lines showing where animals are directed
+    // Bilateral funnels at draft gates — one funnel into penA (top) one into penB (bottom)
     if(dr){
-      const gH=dr.gateHA||60;
-      const isA=GEO.draftDir==='A';
-      // Upper guide (toward penA)
-      ctx.strokeStyle='rgba(100,210,130,.35)';ctx.lineWidth=8;ctx.lineCap='round';
-      ctx.beginPath();
-      ctx.moveTo(dr.x, midY-gH/2);
-      ctx.lineTo(dr.x+40, pa.y+pa.h);
-      ctx.stroke();
-      // Lower guide (toward penB)
-      ctx.strokeStyle='rgba(160,120,200,.35)';
-      ctx.beginPath();
-      ctx.moveTo(dr.x, midY+gH/2);
-      ctx.lineTo(dr.x+40, pb.y);
-      ctx.stroke();
-      ctx.lineCap='butt';
+      const gateHA=dr.gateHA||60;
+      const gwA=GEO.walls.find(w=>w.gateId==='gateA');
+      const gwB=GEO.walls.find(w=>w.gateId==='gateB');
+      const aMidY=gwA?(gwA.y1+gwA.y2)/2:midY-gateHA/2;
+      const bMidY=gwB?(gwB.y1+gwB.y2)/2:midY+gateHA/2;
+      // penA funnel — at gate A x, from race side to penA side
+      taper(dr.x-40, dr.x, aMidY, rc.h*0.55, gwA?gwA.y2-gwA.y1:gateHA, '#2a3c28','#3a5030');
+      taper(dr.x, dr.x+40, aMidY, gwA?gwA.y2-gwA.y1:gateHA, pa.h*0.5, '#2a3c28','#3a5030');
+      // penB funnel
+      taper(dr.x-40, dr.x, bMidY, rc.h*0.55, gwB?gwB.y2-gwB.y1:gateHA, '#3c2830','#503040');
+      taper(dr.x, dr.x+40, bMidY, gwB?gwB.y2-gwB.y1:gateHA, pb.h*0.5, '#3c2830','#503040');
       // Direction highlight
-      ctx.fillStyle=isA?'rgba(80,200,100,.12)':'rgba(140,100,180,.12)';
-      ctx.fillRect(dr.x+2,dr.y,60,dr.h);
+      ctx.fillStyle=GEO.draftDir==='A'?'rgba(80,200,100,.1)':'rgba(140,100,180,.1)';
+      ctx.fillRect(dr.x,dr.y,55,dr.h);
     }
 
+  // ── sc4: Loading ─────────────────────────────────────────────
   }else{
     pen(GEO.zones.yard);
     const rc=GEO.zones.race, rp=GEO.zones.ramp, tk=GEO.zones.truck;
     const midY=rc.y+rc.h/2;
+    const rampNarrow=Math.round(rp.h*0.6);
+
+    // Bilateral funnel at yard→race gate
+    const gwY=GEO.walls.find(w=>w.gateId==='yard');
+    const yardGateH=gwY?gwY.y2-gwY.y1:rc.h;
+    bilateralFunnel(rc.x, midY, GEO.zones.yard.h*0.5, rc.h, yardGateH, 55, '#3c2a12','#6a4820');
 
     // Race (flat)
     raceFlat(rc);
 
-    // Funnel from race width → ramp width (narrower)
-    const rampNarrow=rp.h*0.65; // ramp is 65% of race height at its entry
-    raceTaper(rc.x+rc.w-20, rp.x+20, midY, rc.h, rampNarrow, '#4a3418','#c8a040');
+    // Bilateral funnel at ramp gate: race h → ramp gate h → ramp narrow h
+    const gwR=GEO.walls.find(w=>w.gateId==='ramp');
+    const rampGateH=gwR?gwR.y2-gwR.y1:rampNarrow;
+    bilateralFunnel(rp.x, midY, rc.h, rampNarrow, rampGateH, 40, '#4a3418','#c8a040');
 
-    // Ramp (flat, narrower)
-    raceFlat({x:rp.x,y:midY-rampNarrow/2,w:rp.w,h:rampNarrow});
-    ctx.strokeStyle='#c8a040';ctx.lineWidth=1.5;
-    strokeRR(rp.x,midY-rampNarrow/2,rp.w,rampNarrow,2);
+    // Ramp (narrower flat section)
+    const rampY0=midY-rampNarrow/2, rampY1=midY+rampNarrow/2;
+    ctx.fillStyle='#4a3418';
+    ctx.beginPath();ctx.rect(rp.x,rampY0,rp.w,rampNarrow);ctx.fill();
+    ctx.strokeStyle='#c8a040';ctx.lineWidth=1.5;ctx.stroke();
     for(let rx=rp.x+12;rx<rp.x+rp.w-4;rx+=14){
       ctx.strokeStyle='rgba(255,200,80,.22)';ctx.lineWidth=1;
-      ctx.beginPath();ctx.moveTo(rx,midY-rampNarrow/2);ctx.lineTo(rx,midY+rampNarrow/2);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(rx,rampY0);ctx.lineTo(rx,rampY1);ctx.stroke();
     }
     ctx.fillStyle='rgba(245,192,64,.5)';ctx.font='10px system-ui';ctx.textAlign='center';
-    ctx.fillText('RAMP',rp.x+rp.w/2,midY-rampNarrow/2-5);
+    ctx.fillText('RAMP',rp.x+rp.w/2,rampY0-5);
 
     // Truck
     ctx.fillStyle='#1e2c3a';fillRR(tk.x,tk.y,tk.w,tk.h,5);
@@ -751,10 +788,14 @@ function drawWalls(){
       }
       ctx.fillStyle='rgba(245,192,64,.8)';ctx.font='9px system-ui';ctx.textAlign='center';
       ctx.fillText('tap',cx2,w.y1-5);
-      // Funnel guide lines — angled lines from the solid wall above/below toward gate opening
-      ctx.strokeStyle='rgba(139,96,54,.45)';ctx.lineWidth=2;ctx.lineCap='round';
-      ctx.beginPath();ctx.moveTo(cx2,w.y1);ctx.lineTo(cx2-18,w.y1-22);ctx.stroke();
-      ctx.beginPath();ctx.moveTo(cx2,w.y2);ctx.lineTo(cx2-18,w.y2+22);ctx.stroke();
+      // Bilateral funnel guide lines — angles on both sides of the gate opening
+      ctx.strokeStyle='rgba(139,96,54,.5)';ctx.lineWidth=2;ctx.lineCap='round';
+      // Left side (approach)
+      ctx.beginPath();ctx.moveTo(cx2,w.y1);ctx.lineTo(cx2-20,w.y1-24);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(cx2,w.y2);ctx.lineTo(cx2-20,w.y2+24);ctx.stroke();
+      // Right side (exit)
+      ctx.beginPath();ctx.moveTo(cx2,w.y1);ctx.lineTo(cx2+20,w.y1-24);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(cx2,w.y2);ctx.lineTo(cx2+20,w.y2+24);ctx.stroke();
       ctx.lineCap='butt';
     } else {
       ctx.fillStyle='#2e1c08';ctx.fillRect(cx2-2,w.y1,4,w.y2-w.y1);
